@@ -22,7 +22,7 @@ interface IAppProvider {
 	children: React.ReactNode;
 }
 
-const backendUrl = 'http://localhost:3511';
+const backendUrl = 'http://localhost:3512';
 
 export const AppContext = createContext<IAppContext>({} as IAppContext);
 
@@ -44,20 +44,16 @@ export const AppProvider: React.FC<IAppProvider> = ({ children }) => {
 
 	useEffect(() => {
 		(async () => {
-			try {
-				const user = (
-					await axios.get(`${backendUrl}/currentuser`, {
-						withCredentials: true,
-					})
-				).data;
-				if (user === 'admin') {
-					setAdminIsLoggedIn(true);
-				}
-			} catch (e: any) {
-				if (e.code !== 'ERR_BAD_REQUEST') {
-					const _appMessage = `Sorry, there was an unknown error (${e.code}).`;
-					setAppMessage(_appMessage);
-				}
+			const response = await fetch(`${backendUrl}/currentuser`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					authorization: 'Bearer ' + localStorage.getItem('token'),
+				},
+			});
+			if (response.ok) {
+				const data = await response.json();
+				setAdminIsLoggedIn(true);
 			}
 		})();
 	}, []);
@@ -69,7 +65,7 @@ export const AppProvider: React.FC<IAppProvider> = ({ children }) => {
 	const loginAsAdmin = async (callback: () => void) => {
 		let _appMessage = '';
 		try {
-			await axios.post(
+			const response = await axios.post(
 				`${backendUrl}/login`,
 				{
 					password,
@@ -81,6 +77,7 @@ export const AppProvider: React.FC<IAppProvider> = ({ children }) => {
 					withCredentials: true,
 				}
 			);
+			localStorage.setItem('token', response.data.token);
 			setAdminIsLoggedIn(true);
 			callback();
 		} catch (e: any) {
@@ -108,20 +105,8 @@ export const AppProvider: React.FC<IAppProvider> = ({ children }) => {
 	};
 
 	const logoutAsAdmin = () => {
-		(async () => {
-			try {
-				const user = (
-					await axios.get(`${backendUrl}/logout`, {
-						withCredentials: true,
-					})
-				).data;
-				setAdminIsLoggedIn(false);
-			} catch (e: any) {
-				console.log(
-					`There was a problem with the logout: ${e.message}`
-				);
-			}
-		})();
+		localStorage.removeItem('token');
+		setAdminIsLoggedIn(false);
 	};
 
 	const turnOnWelcomeMessageEditMode = () => {
@@ -137,10 +122,12 @@ export const AppProvider: React.FC<IAppProvider> = ({ children }) => {
 					welcomeMessage,
 				},
 				{
+					method: 'POST',
 					headers: {
 						'Content-Type': 'application/json',
+						authorization:
+							'Bearer ' + localStorage.getItem('token'),
 					},
-					withCredentials: true,
 				}
 			);
 			setIsEditingWelcomeMessage(false);
